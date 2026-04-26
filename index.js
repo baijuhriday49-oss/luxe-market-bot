@@ -2,9 +2,9 @@ const express = require("express");
 const axios = require("axios");
 const admin = require("firebase-admin");
 
-// ── Firebase setup ──────────────────────────────────────────
-let serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
-// Fix private key newlines if they got escaped
+// ── Firebase setup using base64 encoded credentials ─────────
+const credsBase64 = process.env.FIREBASE_CREDENTIALS_BASE64;
+const serviceAccount = JSON.parse(Buffer.from(credsBase64, 'base64').toString('utf8'));
 serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
@@ -142,8 +142,6 @@ app.post("/webhook", async (req, res) => {
 });
 
 app.get("/", (req, res) => res.send("Luxe Market Bot is running! 🛍️"));
-
 setInterval(() => { axios.get(RENDER_URL).catch(() => {}); console.log("Keep-alive ping ✅"); }, 10 * 60 * 1000);
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

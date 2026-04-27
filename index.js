@@ -2,11 +2,14 @@ const express = require("express");
 const axios = require("axios");
 const admin = require("firebase-admin");
 
-// ── Firebase setup using base64 encoded credentials ─────────
-const credsBase64 = process.env.FIREBASE_CREDENTIALS_BASE64;
-const serviceAccount = JSON.parse(Buffer.from(credsBase64, 'base64').toString('utf8'));
-serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+// ── Firebase setup using separate env vars ──────────────────
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  })
+});
 const db = admin.firestore();
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -39,11 +42,9 @@ async function setSession(chatId, data) {
 async function deleteSession(chatId) {
   await db.collection("sessions").doc(String(chatId)).delete();
 }
-
 async function sendMessage(chatId, text, extra = {}) {
   await axios.post(`${TELEGRAM_API}/sendMessage`, { chat_id: chatId, text, parse_mode: "Markdown", ...extra });
 }
-
 async function sendCatalog(chatId) {
   const buttons = products.map((p) => [{ text: `${p.emoji} ${p.name} — $${p.price}`, callback_data: `product_${p.id}` }]);
   await sendMessage(chatId, "🛍️ *Luxe Market — Our Collection*\n\nChoose a product to order:", { reply_markup: { inline_keyboard: buttons } });
@@ -78,7 +79,7 @@ app.post("/webhook", async (req, res) => {
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
       await deleteSession(chatId);
-      await sendMessage(chatId, `✅ *Order Confirmed!*\n\nOrder ID: \`${orderRef.id.slice(0, 8).toUpperCase()}\`\n\n${session.product.emoji} *${session.product.name}*\n👤 ${session.name}\n📍 ${session.address}\n📞 ${session.phone}\n\n💰 *Total: $${session.product.price}*\n\nWe'll contact you shortly to arrange delivery. Thank you! 🛍️`);
+      await sendMessage(chatId, `✅ *Order Confirmed!*\n\nOrder ID: \`${orderRef.id.slice(0, 8).toUpperCase()}\`\n\n${session.product.emoji} *${session.product.name}*\n👤 ${session.name}\n📍 ${session.address}\n📞 ${session.phone}\n\n💰 *Total: $${session.product.price}*\n\nWe'll contact you shortly! Thank you! 🛍️`);
 
     } else if (data === "cancel_order") {
       await deleteSession(chatId);
@@ -99,14 +100,11 @@ app.post("/webhook", async (req, res) => {
     });
     return;
   }
-
   if (text === "🛍️ Browse Products") { await sendCatalog(chatId); return; }
-
   if (text === "📞 Contact Us") {
     await sendMessage(chatId, "📞 *Contact Us*\n\nTelegram: @hriday\nPhone: +91 8077200345\n\nAvailable 9am–9pm IST 🇮🇳");
     return;
   }
-
   if (text === "📦 My Orders") {
     const snapshot = await db.collection("orders").where("chatId", "==", chatId.toString()).orderBy("timestamp", "desc").limit(5).get();
     if (snapshot.empty) {

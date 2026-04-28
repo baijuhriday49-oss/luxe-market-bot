@@ -203,11 +203,12 @@ app.post("/webhook", async (req, res) => {
       return;
     }
 
-    if (text === "/start") {
+    if (text.startsWith("/start")) {
       delete sessions[chatId];
       await sendMessage(chatId, `👋 Welcome to *Luxe Market*!\n\nHandpicked objects of everyday luxury, delivered with a personal touch.\n\nUse the menu below:`, {
         reply_markup: { keyboard: [[{ text: "🛍️ Browse Products" }], [{ text: "📦 My Orders" }, { text: "📞 Contact Us" }]], resize_keyboard: true }
       });
+      if (text.includes("shop")) { await sendCatalog(chatId); }
       return;
     }
 
